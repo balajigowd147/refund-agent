@@ -47,9 +47,13 @@ def create_refund_graph():
     return workflow.compile(checkpointer=memory)
 
 def resume_refund(graph, thread_id: str, answer: Any) -> Dict[str, Any]:
+    config = {"configurable": {"thread_id": thread_id}}
+    snapshot = graph.get_state(config)
+    if "human_approval" not in snapshot.next:
+        raise ValueError("No pending approval for this thread")
     normalized = normalize_human_answer(answer)
     return graph.invoke(
         Command(resume=normalized),
-        {"configurable": {"thread_id": thread_id}}
+        config
     )
 

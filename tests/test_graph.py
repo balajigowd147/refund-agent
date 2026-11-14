@@ -101,6 +101,35 @@ def test_resume_refund(answer, expected_decision, expected_human_decision):
     assert resumed["decision"] == expected_decision
     assert resumed.get("human_decision") == expected_human_decision
 
+def test_resume_refund_never_ran():
+    graph = create_refund_graph()
+    thread_id = "test-thread-never-ran"
+    with pytest.raises(ValueError, match="No pending approval"):
+        resume_refund(graph, thread_id, "approve")
+    
+    state = graph.get_state({"configurable": {"thread_id": thread_id}})
+    assert not state.values
+
+def test_resume_refund_double_resume():
+    graph = create_refund_graph()
+    thread_id = "test-thread-double-resume"
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    paused = graph.invoke(
+        {"request_text": "Refund 600 for order ORD-123", "today": date(2026, 6, 1)},
+        config
+    )
+    assert "__interrupt__" in paused
+    
+    resumed1 = resume_refund(graph, thread_id, "approve")
+    assert resumed1["decision"] == "approved"
+    
+    with pytest.raises(ValueError, match="No pending approval"):
+        resume_refund(graph, thread_id, "reject")
+        
+    state = graph.get_state(config)
+    assert state.values.get("decision") == "approved"
+
 def test_audit_log_full_human_approved_and_policy_rejected():
 
     graph = create_refund_graph()
