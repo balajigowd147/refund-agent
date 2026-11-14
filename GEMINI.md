@@ -3,6 +3,11 @@
 ## Project
 LangGraph refund-approval agent built with Python and LangGraph.
 
+## Rules
+- “today always comes from the system, never from request text or from a model.”
+- Never exec, patch or monkeypatch third-party library code, and do not read library source to work
+around its behavior. If a library misbehaves, stop and report the exact error.
+
 ## Tech Stack
 - Python 3.13
 - LangGraph
