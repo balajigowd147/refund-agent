@@ -1,6 +1,6 @@
 import pytest
 from datetime import date, timedelta
-from agent.policy import check_policy_rules
+from agent.policy import check_policy_rules, normalize_human_answer
 
 def test_unknown_order():
     result = check_policy_rules(
@@ -99,3 +99,17 @@ def test_human_approval_threshold():
         order=order
     )
     assert result_501["decision"] == "pending_human"
+
+@pytest.mark.parametrize("answer, expected", [
+    ("approve", "approve"),
+    ("reject", "reject"),
+    ("APPROVE", "reject"),
+    (" approve ", "reject"),
+    ("approve\n", "reject"),
+    (None, "reject"),
+    (True, "reject"),
+    ({}, "reject"),
+    (1, "reject"),
+])
+def test_normalize_human_answer(answer, expected):
+    assert normalize_human_answer(answer) == expected

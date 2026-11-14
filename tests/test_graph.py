@@ -1,7 +1,7 @@
 import pytest
 from datetime import date
 from langgraph.types import Command
-from agent.graph import create_refund_graph
+from agent.graph import create_refund_graph, resume_refund
 
 def test_auto_approval_graph():
     graph = create_refund_graph()
@@ -62,9 +62,7 @@ def test_human_approval_pause_and_reject():
     ("approve", "approved"),
     ("APPROVE", "rejected"),
     (" approve ", "rejected"),
-    ("NONE", "rejected"),
     (True, "rejected"),
-    ({}, "rejected"),
 ])
 def test_human_approval_strict_matching(resume_val, expected_decision):
     graph = create_refund_graph()
@@ -76,13 +74,35 @@ def test_human_approval_strict_matching(resume_val, expected_decision):
     )
     assert "__interrupt__" in paused
     
-    if resume_val == "NONE":
-        resumed = graph.invoke(None, config)
-    else:
-        resumed = graph.invoke(Command(resume=resume_val), config)
+    resumed = graph.invoke(Command(resume=resume_val), config)
     assert resumed["decision"] == expected_decision
 
+@pytest.mark.parametrize("answer, expected_decision, expected_human_decision", [
+    ("approve", "approved", "approve"),
+    (None, "rejected", "reject"),
+    (True, "rejected", "reject"),
+    ({}, "rejected", "reject"),
+    (1, "rejected", "reject"),
+    ("APPROVE", "rejected", "reject"),
+    ("maybe", "rejected", "reject"),
+])
+def test_resume_refund(answer, expected_decision, expected_human_decision):
+    graph = create_refund_graph()
+    thread_id = f"test-thread-resume-{str(answer)}"
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    paused = graph.invoke(
+        {"request_text": "Refund 600 for order ORD-123", "today": date(2026, 6, 1)},
+        config
+    )
+    assert "__interrupt__" in paused
+    
+    resumed = resume_refund(graph, thread_id, answer)
+    assert resumed["decision"] == expected_decision
+    assert resumed.get("human_decision") == expected_human_decision
+
 def test_audit_log_full_human_approved_and_policy_rejected():
+
     graph = create_refund_graph()
     
     # 1. Full human-approved run: 5 nodes (parse_request, lookup_order, check_policy_node, human_approval, finalize_node)
